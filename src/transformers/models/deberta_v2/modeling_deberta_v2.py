@@ -1135,9 +1135,9 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
 
         return BaseModelOutputWithPooling(
             last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states if output_hidden_states else None,
             attentions=encoder_outputs.attentions,
-            pooler_output=pooled_output,
         )
 
 
@@ -1213,7 +1213,7 @@ class DebertaV2ForMaskedLM(DebertaV2PreTrainedModel):
             masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
-            output = (prediction_scores,) + outputs[1:]
+            output = (prediction_scores,) + outputs[2:]
             return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
         return MaskedLMOutput(
@@ -1290,10 +1290,8 @@ class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
         self.num_labels = num_labels
 
         self.deberta = DebertaV2Model(config)
-        self.pooler = ContextPooler(config)
-        output_dim = self.pooler.output_dim
 
-        self.classifier = nn.Linear(output_dim, num_labels)
+        self.classifier = nn.Linear(config.hidden_size, num_labels)
         drop_out = getattr(config, "cls_dropout", None)
         drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
         self.dropout = StableDropout(drop_out)
@@ -1347,8 +1345,7 @@ class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
             return_dict=return_dict,
         )
 
-        encoder_layer = outputs[0]
-        pooled_output = self.pooler(encoder_layer)
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
@@ -1388,7 +1385,7 @@ class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return SequenceClassifierOutput(
@@ -1467,7 +1464,7 @@ class DebertaV2ForTokenClassification(DebertaV2PreTrainedModel):
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return TokenClassifierOutput(
@@ -1568,7 +1565,7 @@ class DebertaV2ForQuestionAnswering(DebertaV2PreTrainedModel):
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
-            output = (start_logits, end_logits) + outputs[1:]
+            output = (start_logits, end_logits) + outputs[2:]
             return ((total_loss,) + output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(
@@ -1595,10 +1592,8 @@ class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
         self.num_labels = num_labels
 
         self.deberta = DebertaV2Model(config)
-        self.pooler = ContextPooler(config)
-        output_dim = self.pooler.output_dim
 
-        self.classifier = nn.Linear(output_dim, 1)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         drop_out = getattr(config, "cls_dropout", None)
         drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
         self.dropout = StableDropout(drop_out)
@@ -1660,8 +1655,7 @@ class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
             return_dict=return_dict,
         )
 
-        encoder_layer = outputs[0]
-        pooled_output = self.pooler(encoder_layer)
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         reshaped_logits = logits.view(-1, num_choices)
@@ -1672,7 +1666,7 @@ class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
             loss = loss_fct(reshaped_logits, labels)
 
         if not return_dict:
-            output = (reshaped_logits,) + outputs[1:]
+            output = (reshaped_logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return MultipleChoiceModelOutput(
