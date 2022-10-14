@@ -1128,7 +1128,7 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
                 encoded_layers.append(query_states)
 
         sequence_output = encoded_layers[-1]
-        pooled_output = self.pooler(encoder_outputs[0]) if self.pooler is not None else None
+        pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[(1 if output_hidden_states else 2) :]
