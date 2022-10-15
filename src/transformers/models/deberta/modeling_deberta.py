@@ -25,6 +25,7 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from ...activations import ACT2FN
 from ...modeling_outputs import (
     BaseModelOutput,
+    BaseModelOutputWithPooling,
     MaskedLMOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
@@ -925,11 +926,12 @@ DEBERTA_INPUTS_DOCSTRING = r"""
     DEBERTA_START_DOCSTRING,
 )
 class DebertaModel(DebertaPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, add_pooling_layer=True):
         super().__init__(config)
 
         self.embeddings = DebertaEmbeddings(config)
         self.encoder = DebertaEncoder(config)
+        self.pooler = ContextPooler(config) if add_pooling_layer else None
         self.z_steps = 0
         self.config = config
         # Initialize weights and apply final processing
@@ -965,7 +967,7 @@ class DebertaModel(DebertaPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, BaseModelOutput]:
+    ) -> Union[Tuple, BaseModelOutputWithPooling]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1024,12 +1026,14 @@ class DebertaModel(DebertaPreTrainedModel):
                 encoded_layers.append(query_states)
 
         sequence_output = encoded_layers[-1]
+        pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
         if not return_dict:
-            return (sequence_output,) + encoder_outputs[(1 if output_hidden_states else 2) :]
+            return (sequence_output, pooled_output) + encoder_outputs[(1 if output_hidden_states else 2) :]
 
-        return BaseModelOutput(
+        return BaseModelOutputWithPooling(
             last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states if output_hidden_states else None,
             attentions=encoder_outputs.attentions,
         )
@@ -1106,7 +1110,7 @@ class DebertaForMaskedLM(DebertaPreTrainedModel):
             masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
-            output = (prediction_scores,) + outputs[1:]
+            output = (prediction_scores,) + outputs[2:]
             return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
         return MaskedLMOutput(
@@ -1182,10 +1186,8 @@ class DebertaForSequenceClassification(DebertaPreTrainedModel):
         self.num_labels = num_labels
 
         self.deberta = DebertaModel(config)
-        self.pooler = ContextPooler(config)
-        output_dim = self.pooler.output_dim
 
-        self.classifier = nn.Linear(output_dim, num_labels)
+        self.classifier = nn.Linear(config.hidden_size, num_labels)
         drop_out = getattr(config, "cls_dropout", None)
         drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
         self.dropout = StableDropout(drop_out)
@@ -1239,8 +1241,7 @@ class DebertaForSequenceClassification(DebertaPreTrainedModel):
             return_dict=return_dict,
         )
 
-        encoder_layer = outputs[0]
-        pooled_output = self.pooler(encoder_layer)
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
@@ -1280,7 +1281,7 @@ class DebertaForSequenceClassification(DebertaPreTrainedModel):
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return SequenceClassifierOutput(
@@ -1358,7 +1359,7 @@ class DebertaForTokenClassification(DebertaPreTrainedModel):
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return TokenClassifierOutput(
@@ -1458,7 +1459,7 @@ class DebertaForQuestionAnswering(DebertaPreTrainedModel):
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
-            output = (start_logits, end_logits) + outputs[1:]
+            output = (start_logits, end_logits) + outputs[2:]
             return ((total_loss,) + output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(
