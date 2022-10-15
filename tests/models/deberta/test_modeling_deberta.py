@@ -144,11 +144,12 @@ class DebertaModelTester(object):
         model = DebertaModel(config=config)
         model.to(torch_device)
         model.eval()
-        sequence_output = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)[0]
-        sequence_output = model(input_ids, token_type_ids=token_type_ids)[0]
-        sequence_output = model(input_ids)[0]
+        result = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
+        result = model(input_ids, token_type_ids=token_type_ids)
+        result = model(input_ids)
 
-        self.parent.assertListEqual(list(sequence_output.size()), [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.last_hidden_state.shape, (self.batch_size, self.seq_length, self.hidden_size))
+        self.parent.assertEqual(result.pooler_output.shape, (self.batch_size, self.hidden_size))
 
     def create_and_check_deberta_for_masked_lm(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
