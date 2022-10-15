@@ -24,6 +24,7 @@ import tensorflow as tf
 from ...activations_tf import get_tf_activation
 from ...modeling_tf_outputs import (
     TFBaseModelOutput,
+    TFBaseModelOutputWithPooling,
     TFMaskedLMOutput,
     TFQuestionAnsweringModelOutput,
     TFSequenceClassifierOutput,
@@ -911,13 +912,14 @@ class TFDebertaOnlyMLMHead(tf.keras.layers.Layer):
 class TFDebertaMainLayer(tf.keras.layers.Layer):
     config_class = DebertaConfig
 
-    def __init__(self, config: DebertaConfig, **kwargs):
+    def __init__(self, config: DebertaConfig, add_pooling_layer=True, **kwargs):
         super().__init__(**kwargs)
 
         self.config = config
 
         self.embeddings = TFDebertaEmbeddings(config, name="embeddings")
         self.encoder = TFDebertaEncoder(config, name="encoder")
+        self.pooler = TFDebertaContextPooler(config, name="pooler") if add_pooling_layer else None
 
     def get_input_embeddings(self) -> tf.keras.layers.Layer:
         return self.embeddings
@@ -945,7 +947,7 @@ class TFDebertaMainLayer(tf.keras.layers.Layer):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         training: bool = False,
-    ) -> Union[TFBaseModelOutput, Tuple[tf.Tensor]]:
+    ) -> Union[TFBaseModelOutputWithPooling, Tuple[tf.Tensor]]:
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -981,12 +983,14 @@ class TFDebertaMainLayer(tf.keras.layers.Layer):
         )
 
         sequence_output = encoder_outputs[0]
+        pooled_output = self.pooler(hidden_states=sequence_output) if self.pooler is not None else None
 
         if not return_dict:
-            return (sequence_output,) + encoder_outputs[1:]
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
 
-        return TFBaseModelOutput(
+        return TFBaseModelOutputWithPooling(
             last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )
@@ -1230,7 +1234,6 @@ class TFDebertaForSequenceClassification(TFDebertaPreTrainedModel, TFSequenceCla
         self.num_labels = config.num_labels
 
         self.deberta = TFDebertaMainLayer(config, name="deberta")
-        self.pooler = TFDebertaContextPooler(config, name="pooler")
 
         drop_out = getattr(config, "cls_dropout", None)
         drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
@@ -1279,14 +1282,14 @@ class TFDebertaForSequenceClassification(TFDebertaPreTrainedModel, TFSequenceCla
             return_dict=return_dict,
             training=training,
         )
-        sequence_output = outputs[0]
-        pooled_output = self.pooler(sequence_output, training=training)
+
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output, training=training)
         logits = self.classifier(pooled_output)
         loss = None if labels is None else self.hf_compute_loss(labels=labels, logits=logits)
 
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
 
             return ((loss,) + output) if loss is not None else output
 
@@ -1365,7 +1368,7 @@ class TFDebertaForTokenClassification(TFDebertaPreTrainedModel, TFTokenClassific
         loss = None if labels is None else self.hf_compute_loss(labels=labels, logits=logits)
 
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
 
         return TFTokenClassifierOutput(
