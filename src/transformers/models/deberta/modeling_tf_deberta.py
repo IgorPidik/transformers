@@ -1145,6 +1145,8 @@ class TFDebertaModel(TFDebertaPreTrainedModel):
 
 @add_start_docstrings("""DeBERTa Model with a `language modeling` head on top.""", DEBERTA_START_DOCSTRING)
 class TFDebertaForMaskedLM(TFDebertaPreTrainedModel, TFMaskedLanguageModelingLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaConfig, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
@@ -1154,7 +1156,7 @@ class TFDebertaForMaskedLM(TFDebertaPreTrainedModel, TFMaskedLanguageModelingLos
                 "bi-directional self-attention."
             )
 
-        self.deberta = TFDebertaMainLayer(config, name="deberta")
+        self.deberta = TFDebertaMainLayer(config, add_pooling_layer=False, name="deberta")
         self.mlm = TFDebertaOnlyMLMHead(config, input_embeddings=self.deberta.embeddings, name="cls")
 
     def get_lm_head(self) -> tf.keras.layers.Layer:
@@ -1315,12 +1317,14 @@ class TFDebertaForSequenceClassification(TFDebertaPreTrainedModel, TFSequenceCla
     DEBERTA_START_DOCSTRING,
 )
 class TFDebertaForTokenClassification(TFDebertaPreTrainedModel, TFTokenClassificationLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaConfig, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
         self.num_labels = config.num_labels
 
-        self.deberta = TFDebertaMainLayer(config, name="deberta")
+        self.deberta = TFDebertaMainLayer(config, add_pooling_layer=False, name="deberta")
         self.dropout = tf.keras.layers.Dropout(rate=config.hidden_dropout_prob)
         self.classifier = tf.keras.layers.Dense(
             units=config.num_labels, kernel_initializer=get_initializer(config.initializer_range), name="classifier"
@@ -1393,12 +1397,14 @@ class TFDebertaForTokenClassification(TFDebertaPreTrainedModel, TFTokenClassific
     DEBERTA_START_DOCSTRING,
 )
 class TFDebertaForQuestionAnswering(TFDebertaPreTrainedModel, TFQuestionAnsweringLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaConfig, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
         self.num_labels = config.num_labels
 
-        self.deberta = TFDebertaMainLayer(config, name="deberta")
+        self.deberta = TFDebertaMainLayer(config, add_pooling_layer=False, name="deberta")
         self.qa_outputs = tf.keras.layers.Dense(
             units=config.num_labels, kernel_initializer=get_initializer(config.initializer_range), name="qa_outputs"
         )

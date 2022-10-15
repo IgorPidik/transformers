@@ -1150,7 +1150,7 @@ class DebertaV2ForMaskedLM(DebertaV2PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
-        self.deberta = DebertaV2Model(config)
+        self.deberta = DebertaV2Model(config, add_pooling_layer=False)
         self.cls = DebertaV2OnlyMLMHead(config)
 
         # Initialize weights and apply final processing
@@ -1408,7 +1408,7 @@ class DebertaV2ForTokenClassification(DebertaV2PreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.deberta = DebertaV2Model(config)
+        self.deberta = DebertaV2Model(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
@@ -1487,7 +1487,7 @@ class DebertaV2ForQuestionAnswering(DebertaV2PreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.deberta = DebertaV2Model(config)
+        self.deberta = DebertaV2Model(config, add_pooling_layer=False)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
         # Initialize weights and apply final processing

@@ -1240,6 +1240,8 @@ class TFDebertaV2Model(TFDebertaV2PreTrainedModel):
 @add_start_docstrings("""DeBERTa Model with a `language modeling` head on top.""", DEBERTA_START_DOCSTRING)
 # Copied from transformers.models.deberta.modeling_tf_deberta.TFDebertaForMaskedLM with Deberta->DebertaV2
 class TFDebertaV2ForMaskedLM(TFDebertaV2PreTrainedModel, TFMaskedLanguageModelingLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaV2Config, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
@@ -1249,7 +1251,7 @@ class TFDebertaV2ForMaskedLM(TFDebertaV2PreTrainedModel, TFMaskedLanguageModelin
                 "bi-directional self-attention."
             )
 
-        self.deberta = TFDebertaV2MainLayer(config, name="deberta")
+        self.deberta = TFDebertaV2MainLayer(config, add_pooling_layer=False, name="deberta")
         self.mlm = TFDebertaV2OnlyMLMHead(config, input_embeddings=self.deberta.embeddings, name="cls")
 
     def get_lm_head(self) -> tf.keras.layers.Layer:
@@ -1412,12 +1414,14 @@ class TFDebertaV2ForSequenceClassification(TFDebertaV2PreTrainedModel, TFSequenc
 )
 # Copied from transformers.models.deberta.modeling_tf_deberta.TFDebertaForTokenClassification with Deberta->DebertaV2
 class TFDebertaV2ForTokenClassification(TFDebertaV2PreTrainedModel, TFTokenClassificationLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaV2Config, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
         self.num_labels = config.num_labels
 
-        self.deberta = TFDebertaV2MainLayer(config, name="deberta")
+        self.deberta = TFDebertaV2MainLayer(config, add_pooling_layer=False, name="deberta")
         self.dropout = tf.keras.layers.Dropout(rate=config.hidden_dropout_prob)
         self.classifier = tf.keras.layers.Dense(
             units=config.num_labels, kernel_initializer=get_initializer(config.initializer_range), name="classifier"
@@ -1491,12 +1495,14 @@ class TFDebertaV2ForTokenClassification(TFDebertaV2PreTrainedModel, TFTokenClass
 )
 # Copied from transformers.models.deberta.modeling_tf_deberta.TFDebertaForQuestionAnswering with Deberta->DebertaV2
 class TFDebertaV2ForQuestionAnswering(TFDebertaV2PreTrainedModel, TFQuestionAnsweringLoss):
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
     def __init__(self, config: DebertaV2Config, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
         self.num_labels = config.num_labels
 
-        self.deberta = TFDebertaV2MainLayer(config, name="deberta")
+        self.deberta = TFDebertaV2MainLayer(config, add_pooling_layer=False, name="deberta")
         self.qa_outputs = tf.keras.layers.Dense(
             units=config.num_labels, kernel_initializer=get_initializer(config.initializer_range), name="qa_outputs"
         )
